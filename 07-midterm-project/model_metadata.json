@@ -1,0 +1,41 @@
+{
+  "dataset": "train.csv",
+  "dataset_sha256": "f9e8cd3154b8684a1be0ff401b1fba7750710af6bd076a399c6ce7ceb979c624",
+  "raw_rows": 2000,
+  "clean_rows": 1800,
+  "rows_removed": 200,
+  "features": [
+    "battery_power",
+    "blue",
+    "clock_speed",
+    "dual_sim",
+    "fc",
+    "four_g",
+    "int_memory",
+    "m_dep",
+    "mobile_wt",
+    "n_cores",
+    "pc",
+    "px_height",
+    "px_width",
+    "ram",
+    "sc_h",
+    "sc_w",
+    "talk_time",
+    "three_g",
+    "touch_screen",
+    "wifi"
+  ],
+  "target": "price_range",
+  "model": "StandardScaler + SVC(C=1.0, kernel=linear, gamma=scale, probability=True)",
+  "random_state": 42,
+  "scikit_learn": "1.9.1",
+  "preprocessing": "Drop px_height==0, sc_w==0, and 1.5*IQR outliers",
+  "metrics": {
+    "val_auc_ovr": 0.996914,
+    "test_auc_ovr": 1.0,
+    "test_accuracy": 0.988889
+  },
+  "model_sha256": "9de4c2b69e9a7e70f210cf26a5f4a7bc33a2a3602c8bbdb41927a4232f37e910",
+  "feature_defaults_sha256": "8183ea1af49d46d30936235664cbff057655a87ce96f68664671fb5458b16dbf"
+}
