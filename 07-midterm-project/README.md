@@ -5,7 +5,7 @@ An end-to-end Machine Learning classification project for Midterm Project of ML 
 ---
 
 ## 1. Problem Statement
-In a competitive consumer electronics market, pricing new mobile devices accurately is critical to balancing profit margins and market share. Rather than estimating exact retail prices—which fluctuate heavily by brand and region—this project frames pricing as a **4-class classification problem** (`price_range`: `0` = Low Cost, `1` = Medium Cost, `2` = High Cost, `3` = Very High Cost).
+In a competitive consumer electronics market, pricing new mobile devices accurately is critical to balancing profit margins and market share. Rather than estimating exact retail prices—which fluctuate heavily by brand and region—this project frames pricing as a **4-class classification problem** (`price_range`: `0` = Low Cost, `1` = Intermediate-Low Cost, `2` = Intermediate-High Cost, `3` = High Cost).
 
 The goal is to build an interpretable, reproducible ML pipeline and deploy it as a REST API capable of classifying any mobile device into its corresponding price tier from its technical specifications.
 
@@ -31,7 +31,7 @@ The goal is to build an interpretable, reproducible ML pipeline and deploy it as
 ## 3. Dataset Description
 The dataset comes from Kaggle's [Mobile Price Classification](https://kaggle.com) repository (`train.csv`):
 * **Size:** 2,000 rows and 21 columns (20 input features + 1 target).
-* **Target Variable (`price_range`):** `0` (Low Cost), `1` (Medium Cost), `2` (High Cost), `3` (Very High Cost).
+* **Target Variable (`price_range`):** `0` (Low Cost), `1` (Intermediate-Low Cost), `2` (Intermediate-High Cost), `3` (High Cost).
 * **Features (20 hardware & connectivity attributes):**
   * *Continuous/Discrete Numeric:* `ram` (MB), `battery_power` (mAh), `int_memory` (GB), `px_height`, `px_width`, `sc_h` (cm), `sc_w` (cm), `mobile_wt` (g), `clock_speed` (GHz), `m_dep` (cm), `n_cores`, `pc` (primary camera MP), `fc` (front camera MP), `talk_time` (hrs).
   * *Binary Flags (`0`/`1`):* `blue` (Bluetooth), `dual_sim`, `four_g`, `three_g`, `touch_screen`, `wifi`.
@@ -177,7 +177,7 @@ curl -X POST -H "Content-Type: application/json" \
 ```json
 {
   "price_range": 3,
-  "price_label": "Very High Cost",
+  "price_label": "High Cost",
   "confidence": 0.998412,
   "class_probabilities": {
     "0": 0.0,

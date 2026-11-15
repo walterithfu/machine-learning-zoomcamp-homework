@@ -39,7 +39,7 @@ PRICE_LABELS = {
     3: "High Cost",
 }
 
-app = FastAPI(title="Mobile Price Classification API for ML Zoomcamp 2026 midterm project")
+app = FastAPI(title="Mobile Price Classification API for ML Zoomcamp 2026 Midterm Project")
 
 # Defining MobileSpecs class using BaseModel from pydantic as base
 class MobileSpecs(BaseModel):
