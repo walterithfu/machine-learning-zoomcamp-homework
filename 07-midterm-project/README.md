@@ -39,12 +39,13 @@ The dataset comes from Kaggle's [Mobile Price Classification](https://kaggle.com
 ---
 
 ## 4. EDA & Preprocessing Summary
-* **Class Balance & Missing Values:** The dataset contains **0 missing values**, **0 duplicate rows**, and a perfectly balanced target distribution (**500 samples per class**).
-* **Key Predictive Signal:** `ram` exhibits an overwhelming positive correlation with `price_range` (\(r \approx 0.92\)), followed by `battery_power`, `px_width`, and `px_height` (\(r \approx 0.15\text{–}0.20\)).
-* **Anomaly & Outlier Removal (`preprocessing`):**
+* **Class Balance & Missing Values:** The dataset contains 0 missing values, 0 duplicate rows, and a perfectly balanced target distribution (500 samples per class).
+* **Key Predictive Signal:** `ram` exhibits an overwhelming positive correlation with `price_range` ($r \approx 0.92$), followed by `battery_power`, `px_width`, and `px_height` ($r \approx 0.15\text{–}0.20$).
+* **Anomaly & Outlier Removal (preprocessing):**
   * Removed rows with physically impossible zero values in screen dimensions (`px_height == 0` and `sc_w == 0`).
-  * Filtered extreme statistical outliers across continuous features using the \(1.5 \times \text{IQR}\) rule.
+  * Filtered extreme statistical outliers across continuous features using the $1.5 \times \text{IQR}$ rule.
 * **Feature Engineering Decision:** No synthetic features were added. All 20 features are already clean numerical quantities or binary indicators in standard real-world units, preserving maximum interpretability without introducing multicollinearity.
+
 
 ---
 
