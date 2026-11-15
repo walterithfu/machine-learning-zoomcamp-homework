@@ -27,15 +27,17 @@
     "wifi"
   ],
   "target": "price_range",
-  "model": "StandardScaler + SVC(C=1.0, kernel=linear, gamma=scale, probability=True)",
+  "model": "StandardScaler + SVC(C=10.0, kernel=linear, gamma=scale, probability=True)",
+  "validation_strategy": "90/10 Stratified Split + 5-Fold Stratified CV",
   "random_state": 42,
   "scikit_learn": "1.9.1",
   "preprocessing": "Drop px_height==0, sc_w==0, and 1.5*IQR outliers",
   "metrics": {
-    "val_auc_ovr": 0.996914,
+    "cv_auc_ovr_mean": 0.998286,
+    "cv_auc_ovr_std": 0.000574,
     "test_auc_ovr": 1.0,
-    "test_accuracy": 0.988889
+    "test_accuracy": 0.994444
   },
-  "model_sha256": "9de4c2b69e9a7e70f210cf26a5f4a7bc33a2a3602c8bbdb41927a4232f37e910",
+  "model_sha256": "16a0286bb28f40350f2b0716dc7af7df69030dd3c0211913a0f56f02dc533b1a",
   "feature_defaults_sha256": "8183ea1af49d46d30936235664cbff057655a87ce96f68664671fb5458b16dbf"
 }

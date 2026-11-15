@@ -10,7 +10,7 @@ import sklearn
 from pathlib import Path
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
@@ -25,6 +25,7 @@ FEATURES = [
     "px_width", "ram", "sc_h", "sc_w", "talk_time", "three_g",
     "touch_screen", "wifi"
 ]
+
 
 def preprocessing(df: pd.DataFrame) -> pd.DataFrame:
     """Removes rows containing anomalous zero values and statistical outliers.
@@ -44,7 +45,6 @@ def preprocessing(df: pd.DataFrame) -> pd.DataFrame:
             removed and a reset index.
     """
     df_clean = df.copy()
-    initial_rows = len(df_clean)
 
     # Drop rows with physical zero anomalies in screen dimensions
     zero_anomaly_cols = ["px_height", "sc_w"]
@@ -75,7 +75,7 @@ def preprocessing(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_pipeline(
-    c_param: float = 1.0,
+    c_param: float = 10.0,  # Update this if your GridSearchCV winner used C=1.0 or C=50.0
     kernel: str = "linear",
     gamma: str = "scale",
 ):
@@ -91,14 +91,15 @@ def build_pipeline(
         ),
     )
 
+
 def train(
     data_path: Path,
     model_path: Path,
-    c_param: float = 1.0,
+    c_param: float = 10.0,  # Update this to match your GridSearchCV winner
     kernel: str = "linear",
     gamma: str = "scale",
 ) -> None:
-    """Loads raw data, cleans anomalies, evaluates on hold-out test, and exports artifacts."""
+    """Loads raw data, cleans anomalies, evaluates via 5-Fold CV & hold-out test, and exports artifacts."""
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset not found at: {data_path}")
 
@@ -109,19 +110,20 @@ def train(
     X = clean_df[FEATURES]
     y = clean_df[TARGET].astype(int)
 
-    # 2. Reproducible 80/10/10 split (Train+Val 90% vs Hold-out Test 10%)
+    # 2. Reproducible 90/10 split (Train+Val 90% vs Hold-out Test 10%)
     X_train_val, X_test, y_train_val, y_test = train_test_split(
         X, y, test_size=0.10, random_state=42, stratify=y
     )
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=(1 / 9), random_state=42, stratify=y_train_val
+
+    # 3. Evaluate via 5-Fold Stratified CV and hold-out test for reproducibility logging
+    cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    eval_pipeline = build_pipeline(c_param=c_param, kernel=kernel, gamma=gamma)
+
+    cv_scores = cross_val_score(
+        eval_pipeline, X_train_val, y_train_val, cv=cv_strategy, scoring="roc_auc_ovr", n_jobs=-1
     )
 
-    # 3. Evaluate on validation and test splits for reproducibility logging
-    eval_pipeline = build_pipeline(c_param=c_param, kernel=kernel, gamma=gamma)
-    eval_pipeline.fit(X_train, y_train)
-
-    val_auc = roc_auc_score(y_val, eval_pipeline.predict_proba(X_val), multi_class="ovr")
+    eval_pipeline.fit(X_train_val, y_train_val)
     test_probs = eval_pipeline.predict_proba(X_test)
     test_preds = eval_pipeline.predict(X_test)
     test_auc = roc_auc_score(y_test, test_probs, multi_class="ovr")
@@ -155,11 +157,13 @@ def train(
         "features": FEATURES,
         "target": TARGET,
         "model": f"StandardScaler + SVC(C={c_param}, kernel={kernel}, gamma={gamma}, probability=True)",
+        "validation_strategy": "90/10 Stratified Split + 5-Fold Stratified CV",
         "random_state": 42,
         "scikit_learn": sklearn.__version__,
         "preprocessing": "Drop px_height==0, sc_w==0, and 1.5*IQR outliers",
         "metrics": {
-            "val_auc_ovr": round(float(val_auc), 6),
+            "cv_auc_ovr_mean": round(float(cv_scores.mean()), 6),
+            "cv_auc_ovr_std": round(float(cv_scores.std()), 6),
             "test_auc_ovr": round(float(test_auc), 6),
             "test_accuracy": round(float(test_acc), 6),
         },
@@ -172,13 +176,14 @@ def train(
 
     print(json.dumps(metadata, indent=2))
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Train the Mobile Price Classification SVC model for ML Zoomcamp 2026 midterm project model"
+        description="Train the Mobile Price Classification SVC model for ML Zoomcamp 2026 midterm project"
     )
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="Path to train.csv")
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Output path for pipeline.bin")
-    parser.add_argument("--C", type=float, default=1.0, help="Regularization parameter")
+    parser.add_argument("--C", type=float, default=10.0, help="Regularization parameter")
     parser.add_argument("--kernel", type=str, default="linear", help="Kernel type (linear, rbf, poly)")
     parser.add_argument("--gamma", type=str, default="scale", help="Kernel coefficient (scale, auto)")
     args = parser.parse_args()

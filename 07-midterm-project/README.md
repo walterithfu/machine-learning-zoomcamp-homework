@@ -13,18 +13,27 @@ The goal is to build an interpretable, reproducible ML pipeline and deploy it as
 
 ## 2. Architecture Overview
 
-```text
-+-------------------+       +------------------------+       +-------------------------+
+```mermaid
+flowchart LR
+    subgraph Data["1. Data & Preparation"]
+        A[("train.csv<br/>(2,000 devices, 20 specs)")] --> B["Drop 0-Dim Anomalies<br/>(px_height == 0, sc_w == 0)"]
+        B --> C["Outlier Filtering (1.5x IQR)<br/>1,800 Clean Rows (Classes 0–3)"]
+    end
 
-|   Raw Dataset     |       |   Training Pipeline    |       |   Production Web API    |
-|   (train.csv)     | ----> |      (train.py)        | ----> |  (predict.py/serve.py)  |
-+-------------------+       +------------------------+       +-------------------------+
-  • 2,000 devices             • Drop 0-dim anomalies           • FastAPI + Uvicorn
-  • 20 hardware specs         • 1.5*IQR outlier filter         • Port 9696 exposed
-  • 4 balanced classes        • StandardScaler + SVC           • POST /predict
-                              • Exports pipeline.bin &         • GET  /health
-                                feature_defaults.json
+    subgraph Training["2. Training & Serialization (train.py)"]
+        C --> D["Stratified Split (90/10)<br/>+ 5-Fold CV (ROC-AUC)"]
+        D --> E["StandardScaler + Linear SVC<br/>(C=10 | CV: 0.9983 | Test Acc: 99.44%)"]
+        E --> F[("Artifacts<br/>pipeline.bin<br/>feature_defaults.json<br/>model_metadata.json")]
+    end
+
+    subgraph Serving["3. Inference Microservice (Docker)"]
+        F --> G["predict.py<br/>Pydantic + Median Fallback"]
+        G --> H["serve.py<br/>FastAPI + Uvicorn (:9696)"]
+        I(["Client Request<br/>POST /predict | GET /health"]) <-->|JSON| H
+    end
+
 ```
+
 
 ---
 
@@ -50,31 +59,29 @@ The dataset comes from Kaggle's [Mobile Price Classification](https://kaggle.com
 ---
 
 ## 5. Modeling Approach & Metrics
-The cleaned dataset was split using stratified sampling into **80% Train / 10% Validation / 10% Test**. Hyperparameters were tuned on the Train/Validation sets optimizing for **Multi-class One-vs-Rest AUC-ROC (`roc_auc_ovr`)**, and final generalization was evaluated on the untouched Test set:
+The cleaned dataset was split using stratified sampling into **90% Train+Validation / 10% Hold-out Test**. Hyperparameters were tuned via **5-Fold Stratified Cross-Validation (`StratifiedKFold`)** optimizing for **Multi-class One-vs-Rest AUC-ROC (`roc_auc_ovr`)**, and final generalization was evaluated on the untouched Test set:
 
-| Model | Best Hyperparameters | Val AUC-ROC | Test AUC-ROC | Test Accuracy |
+| Model | Best Hyperparameters | 5-Fold CV AUC-ROC | Test AUC-ROC | Test Accuracy |
 | :--- | :--- | :---: | :---: | :---: |
-| **Support Vector Machine (SVC)** | `C=1`, `kernel='linear'`, `gamma='scale'` | **0.9969** | **1.0000** | **98.89%** |
-| **Gradient Boosting** | `learning_rate=0.1`, `max_depth=3`, `n_estimators=200` | 0.9812 | 0.9942 | 93.33% |
-| **Random Forest** | `max_depth=None`, `min_samples_split=2`, `n_estimators=300` | 0.9709 | 0.9884 | 93.33% |
-| **Baseline (Shallow Tree)** | `max_depth=3` | 0.8885 | 0.9270 | 79.44% |
+| **Support Vector Machine (SVC)** | `C=50`, `kernel='linear'`, `gamma='scale'` | **0.9987 ± 0.0005** | **1.0000** | **100.00%** |
+| **Gradient Boosting** | `learning_rate=0.1`, `max_depth=3`, `n_estimators=200` | 0.9860 ± 0.0020 | 0.9960 | 95.00% |
+| **Random Forest** | `max_depth=20`, `min_samples_split=2`, `n_estimators=300` | 0.9770 ± 0.0034 | 0.9905 | 91.67% |
+| **Baseline (Shallow Tree)** | `max_depth=3` | 0.9144 ± 0.0064 | 0.9352 | 76.67% |
 
-* **Winner Selection:** **Linear SVC (`C=1`)** achieved the highest Validation AUC-ROC (`0.9969`), a perfect **1.0000 Test AUC-ROC**, and **98.89% Test Accuracy** (178/180 test samples classified correctly), confirming that the underlying hardware-to-price boundary is strongly linear.
-
-* **Winner Selection:** **Linear SVC (`C=1`)** achieved the highest Validation AUC-ROC (`0.9969`), a perfect **1.0000 Test AUC-ROC**, and **98.89% Test Accuracy** (178/180 test samples classified correctly), confirming that the underlying hardware-to-price boundary is strongly linear.
+* **Winner Selection:** **Linear SVC (`C=50`)** achieved the highest 5-Fold CV AUC-ROC (`0.9987 ± 0.0005`), a perfect **1.0000 Test AUC-ROC**, and **100.00% Test Accuracy** (180/180 test samples classified correctly), confirming that the underlying hardware-to-price boundary is strongly linear.
 
 ### Feature Importance Analysis (Winning Model)
 To verify model interpretability, both **Standardized Linear Coefficients** ($\text{Mean } |\text{coef}|$) and **Permutation Importance** (drop in Test `roc_auc_ovr` over 15 repeats) were computed on the hold-out test set:
 
 | Rank | Feature | Mean \|Coefficient\| (Scaled) | Permutation Importance (AUC Drop) |
 | :---: | :--- | :---: | :---: |
-| **1** | `ram` | **4.4949** | **0.4613 ± 0.0312** |
-| **2** | `battery_power` | **1.0959** | **0.0877 ± 0.0152** |
-| **3** | `px_width` | **0.6678** | **0.0240 ± 0.0050** |
-| **4** | `px_height` | **0.6668** | **0.0249 ± 0.0057** |
-| **5** | `mobile_wt` | **0.1958** | **0.0015 ± 0.0006** |
+| **1** | `ram` | **13.4385** | **0.4610 ± 0.0301** |
+| **2** | `battery_power` | **3.3047** | **0.0944 ± 0.0159** |
+| **3** | `px_height` | **2.0584** | **0.0251 ± 0.0077** |
+| **4** | `px_width` | **1.9509** | **0.0194 ± 0.0044** |
+| **5** | `mobile_wt` | **0.5897** | **0.0009 ± 0.0004** |
 
-* **Key Takeaway:** `ram` alone accounts for a ~0.46 drop in Test AUC-ROC when permuted, followed by `battery_power` and screen resolution (`px_width`, `px_height`). Secondary attributes (`mobile_wt`, `int_memory`, connectivity flags) act as fine-grained tie-breakers near class decision boundaries, directly validating the initial EDA correlations.
+* **Key Takeaway:** `ram` alone accounts for a ~0.46 drop in Test AUC-ROC when permuted, followed by `battery_power` and screen resolution (`px_height`, `px_width`). Secondary attributes (`mobile_wt`, `int_memory`, connectivity flags) act as fine-grained tie-breakers near class decision boundaries, directly validating the initial EDA correlations.
 
 ---
 
